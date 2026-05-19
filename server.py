@@ -7,7 +7,7 @@ from engine import ProgramExecutor
 # configurarea server-ului
 HOST = '0.0.0.0'
 PORT = 5050
-PROGRAMS_DIR = "programs" # folder-ul cu fisierele .txt
+PROGRAMS_DIR = "programe" # folder-ul cu fisierele .txt
 
 programs = {}
 programs_lock = threading.Lock()
@@ -153,6 +153,10 @@ def handle_client(conn, addr):
                     line_nr = int(parts[2])
                 except ValueError:
                     conn.send("ERROR: line must be a number!\n".encode())
+                    continue
+
+                if prog_name != attached_program:
+                    conn.send("ERROR you can only add breakpoints to your attached program\n".encode())
                     continue
 
                 if prog_name not in programs:
