@@ -32,30 +32,6 @@ def load_programs():
 
             print(f"[SERVER] Program incarcat: {name}")
 
-def start_programs():
-    for name, program in programs.items():
-        executor = program["executor"]
-
-        # injectam callback-urile
-        def make_pause_callback(prog_name):
-            def on_pause(line):
-                send_to_client(prog_name, f"BREAKPOINT HIT on line {line}")
-            return on_pause
-
-        def make_finish_callback(prog_name):
-            def on_finish():
-                send_to_client(prog_name, "PROGRAM FINISHED!!")
-            return on_finish
-
-        executor.on_pause_callback = make_pause_callback(name)
-        executor.on_finish_callback = make_finish_callback(name)
-
-        # daemon pe True inseamna ca thread-ul se opreste odata cu oprirea server-ului
-        t = threading.Thread(target=executor.run, daemon=True)
-        t.start()
-        program["started"] = True
-        print(f"[SERVER] Program pornit: {name}")
-
 def start_single_program(prog_name):
     """Porneste un singur program - apelat la comanda START din client."""
     program = programs[prog_name]
