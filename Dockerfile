@@ -5,10 +5,10 @@ WORKDIR /app
 COPY server.py ./server.py
 COPY engine.py ./engine.py
 
-RUN mkdir -p programs
-COPY programe/program1.txt ./programs/program1.txt
-COPY programe/program2.txt ./programs/program2.txt
-COPY programe/program3.txt ./programs/program3.txt
+RUN mkdir -p programe
+COPY programe/program1.txt ./programe/program1.txt
+COPY programe/program2.txt ./programe/program2.txt
+COPY programe/program3.txt ./programe/program3.txt
 
 EXPOSE 5050
 
