@@ -200,6 +200,10 @@ def handle_client(conn, addr):
                     conn.send(f"ERROR program {prog_name} not found\n".encode())
                     continue
 
+                if prog_name != attached_program:
+                    conn.send("ERROR you can only remove breakpoints from your attached program\n".encode())
+                    continue
+
                 program = programs[prog_name]
 
                 # cerinta: nu poti elimina breakpoints in timpul executiei
@@ -224,12 +228,16 @@ def handle_client(conn, addr):
                 var_name = parts[1]
                 program = programs[attached_program]
 
-                if program["executor"].state != "paused":
+                if program["executor"].state == "running":
                     conn.send("ERROR program is not paused, cannot extract any value\n".encode())
                     continue
 
+                # dacă e paused sau finished, poți evalua
                 value = program["executor"].get_variable(var_name)
-                conn.send(f"VALUE {var_name} {value}\n".encode())
+                if "EROARE" in str(value):
+                    conn.send(f"ERROR variable {var_name} not found\n".encode())
+                else:
+                    conn.send(f"VALUE {var_name} {value}\n".encode())
 
             # set variable
             elif command == "SET":
