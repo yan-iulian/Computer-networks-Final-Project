@@ -117,6 +117,10 @@ def handle_client(conn, addr):
                     conn.send(f"ERROR program {prog_name} not found\n".encode())
                     continue
 
+                if attached_program is not None:
+                    conn.send(f"ERROR already attached to {attached_program}, detach first\n".encode())
+                    continue
+
                 program = programs[prog_name]
 
                 with program["lock"]:

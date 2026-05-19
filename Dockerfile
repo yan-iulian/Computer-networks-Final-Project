@@ -12,4 +12,4 @@ COPY programe/program3.txt ./programe/program3.txt
 
 EXPOSE 5050
 
-CMD ["python", "server.py"]
+CMD ["python", "-u", "server.py"]
