@@ -1,0 +1,4 @@
+a = 5
+b = a * 2 + 10
+c = a + b
+rezultat = b / 2

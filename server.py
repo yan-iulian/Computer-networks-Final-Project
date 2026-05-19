@@ -129,32 +129,137 @@ def handle_client(conn, addr):
 
             # START - porneste programul atasat (dupa ce ai setat breakpoints)
             elif command == "START":
-                conn.send("ERROR command not implemented yet\n".encode())
+                if attached_program is None:
+                    conn.send("ERROR not attached to any program\n".encode())
+                    continue
+
+                program = programs[attached_program]
+
+                if program["started"]:
+                    conn.send("ERROR program already started\n".encode())
+                    continue
+
+                start_single_program(attached_program)
+                conn.send(f"OK program {attached_program} started\n".encode())
 
             # adding a breakpoint
             elif command == "ADD_BREAKPOINT":
+                if len(parts) < 3:
+                    conn.send("ERROR missing arguments\n".encode())
+                    continue
+                prog_name = parts[1]
+
+                try:
+                    line_nr = int(parts[2])
+                except ValueError:
+                    conn.send("ERROR: line must be a number!\n".encode())
+                    continue
+
+                if prog_name not in programs:
+                    conn.send(f"ERROR progam {prog_name} not found\n".encode())
+                    continue
+
+                program = programs[prog_name]
+
                 # cerinta: nu poti adauga breakpoints in timpul executiei
                 # doar daca e paused sau inca nestartat
-                conn.send("ERROR command not implemented yet\n".encode())
+                if program["executor"].state == "running":
+                    conn.send("ERROR cannot add breakpoint while program is running\n".encode())
+                    continue
+
+                if program["executor"].state == "finished":
+                    conn.send("ERROR program already finished\n".encode())
+                    continue
+
+                program["executor"].set_breakpoint(line_nr)
+                conn.send(f"OK breakpoint added at line {line_nr}\n".encode())
 
 
             # removing a breakpoint
             elif command == "REMOVE_BREAKPOINT":
+                if len(parts) < 3:
+                    conn.send("ERROR missing arguments\n".encode())
+                    continue
+                prog_name = parts[1]
+
+                try:
+                    line_nr = int(parts[2])
+                except ValueError:
+                    conn.send("ERROR line must be a number!\n".encode())
+                    continue
+
+                if prog_name not in programs:
+                    conn.send(f"ERROR program {prog_name} not found\n".encode())
+                    continue
+
+                program = programs[prog_name]
+
                 # cerinta: nu poti elimina breakpoints in timpul executiei
-                conn.send("ERROR command not implemented yet\n".encode())
+                if program["executor"].state == "running":
+                    conn.send("ERROR cannot remove breakpoint while program is running\n".encode())
+                    continue
+
+                program["executor"].remove_breakpoint(line_nr)
+                conn.send(f"OK breakpoint removed from line {line_nr}\n".encode())
 
 
             # evaluation of a variab.
             elif command == "EVAL":
-                conn.send("ERROR command not implemented yet\n".encode())
+                if attached_program is None:
+                    conn.send("ERROR not attached to any programs\n".encode())
+                    continue
+
+                if len(parts) < 2:
+                    conn.send("ERROR missing arguments\n".encode())
+                    continue
+
+                var_name = parts[1]
+                program = programs[attached_program]
+
+                if program["executor"].state != "paused":
+                    conn.send("ERROR program is not paused, cannot extract any value\n".encode())
+                    continue
+
+                value = program["executor"].get_variable(var_name)
+                conn.send(f"VALUE {var_name} {value}\n".encode())
 
             # set variable
             elif command == "SET":
-                conn.send("ERROR command not implemented yet\n".encode())
+                if attached_program is None:
+                    conn.send("ERROR not attached to any program\n".encode())
+                    continue
+
+                if len(parts) < 3:
+                    conn.send("ERROR missing arguments\n".encode())
+                    continue
+
+                var_name = parts[1]
+                value = parts[2]
+                program = programs[attached_program]
+
+                if program["executor"].state != "paused":
+                    conn.send("ERROR program is not paused, cannot set any value\n".encode())
+                    continue
+
+                success = program["executor"].set_variable(var_name, value)
+                if success:
+                    conn.send(f"OK {var_name} set to {value}\n".encode())
+                else:
+                    conn.send(f"ERROR invalid value {value}\n".encode())
 
             # continue
             elif command == "CONTINUE":
-                conn.send("ERROR command not implemented yet\n".encode())
+                if attached_program is None:
+                    conn.send("ERROR not attached to any program\n".encode())
+                    continue
+                program = programs[attached_program]
+
+                if program["executor"].state != "paused":
+                    conn.send("ERROR cannot continue a program that was not paused beforehand\n".encode())
+                    continue
+
+                program["executor"].continue_execution()
+                conn.send("OK program continuing..\n".encode())
 
             # detach from a program
             elif command == "DETACH":
@@ -171,7 +276,12 @@ def handle_client(conn, addr):
 
             # list
             elif command == "LIST":
-                conn.send("ERROR command not implemented yet\n".encode())
+                response = "PROGRAMS:\n"
+                for name, prog in programs.items():
+                    state = prog["executor"].state
+                    has_client = "occupied" if prog["client"] else "free"
+                    response += f"{name} | {state} | {has_client}\n"
+                conn.send(response.encode())
 
             else:
                 conn.send(f"ERROR unknown command {command}\n".encode())
@@ -180,10 +290,13 @@ def handle_client(conn, addr):
     except Exception as e:
         print(f"[SERVER] Eroare cu clientul {addr}: {e}")
     finally:
-        # TODO: de implementat - curatare resurse la deconectarea clientului:
-        # 1. daca clientul era atasat la un program, detaseaza-l (seteaza program["client"] = None)
-        # 2. daca programul era in starea "paused", apeleaza continue_execution() ca sa nu ramana blocat
-        # 3. de inchis conexiunea
+        if attached_program and attached_program in programs:
+            program = programs[attached_program]
+            with program["lock"]:
+                if program["client"] == conn:
+                    program["client"] = None
+                    if program["executor"].state == "paused":
+                        program["executor"].continue_execution()
         conn.close()
         print(f"[SERVER] Client deconectat: {addr}")
 
